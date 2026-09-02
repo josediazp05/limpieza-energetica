@@ -3,9 +3,9 @@ import "./globals.css";
 import MetaPixel from "./components/MetaPixel";
 
 export const metadata: Metadata = {
-  title: "Limpieza Energética — Maldiciones Familiares",
+  title: "Limpiezas Energéticas",
   description:
-    "Libera las maldiciones familiares que se repiten en tu árbol: la limpieza energética guiada por Cristina Lozano.",
+    "Limpieza energética guiada por Cristina Lozano, con checkout seguro en Whop.",
 };
 
 export default function RootLayout({

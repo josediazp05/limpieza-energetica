@@ -5,14 +5,14 @@ import { PASOS } from "../funnel";
 // ningún otro sitio. Los precios NO: esos los manda Whop en cada carga.
 
 /**
- * El plan del producto principal, el de la VSL de Maldiciones Familiares.
+ * El plan del producto principal, el de la VSL de Limpiezas Energéticas.
  * Sale de `WHOP_PLAN_MAIN` para no tener el id de un plan de producción
  * escrito en el repo.
  */
 export const MAIN_PLAN_ID = PASOS.checkout.planId ?? "";
 
 /** Solo se usa si Whop no responde. El precio de verdad lo manda la API. */
-export const MAIN_FALLBACK_USD = Number(process.env.FUNNEL_VALOR_MAIN ?? 27) || 27;
+export const MAIN_FALLBACK_AMOUNT = Number(process.env.FUNNEL_VALOR_MAIN ?? 67) || 67;
 
 export const PRODUCT = {
   /**
@@ -24,7 +24,7 @@ export const PRODUCT = {
   brandLogo: "",
   /** Respaldo del nombre si Whop no responde y no hay nada escrito arriba. */
   brandFallback: "Cristina Lozano · Constelaciones",
-  name: "Limpieza Energética — Maldiciones Familiares",
+  name: "Limpiezas Energéticas",
   /**
    * A dónde vuelve el comprador cuando el pago termina.
    *

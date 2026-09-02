@@ -51,9 +51,9 @@ export async function abrirSesionDelPedido(
   const clientIp =
     h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || undefined;
   const userAgent = h.get("user-agent") || undefined;
-  // La venta entra en dólares siempre. Lo que el comprador ve en la suya lo
-  // convierte Whop dentro del iframe, con su propia tasa.
-  const moneda = "usd";
+  // La venta entra en la moneda base del plan. Lo que el comprador ve en la
+  // suya lo convierte Whop dentro del iframe, con su propia tasa.
+  const moneda = pricing.currency;
 
   const metadata = limpiar({
     fbc,
@@ -92,8 +92,8 @@ export async function abrirSesionDelPedido(
         eventId: session.id,
         eventTime: new Date(),
         value: total.today,
-        // La moneda tiene que ser la del importe: mandar pesos etiquetados como
-        // dólares le rompe a Meta el valor de conversión y con él el ROAS.
+        // La moneda tiene que ser la del importe: mandar una cifra etiquetada
+        // con otra moneda le rompe a Meta el valor de conversión y el ROAS.
         currency: moneda.toUpperCase(),
         fbc,
         fbp,

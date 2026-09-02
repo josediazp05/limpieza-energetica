@@ -1,17 +1,19 @@
 # Limpiezas Energéticas — embudo Whop
 
-Checkout propio y endpoints del embudo para la VSL de **Maldiciones Familiares**
-de Cristina Lozano. Mismo esqueleto que `kevin-mvp`: Next 16 + Tailwind 4 +
-pnpm, checkout de Whop embebido y cobro de un clic para upsells y downsells.
+Checkout propio, mirror local de las páginas de venta y endpoints del embudo
+para **Limpiezas Energéticas → Maldiciones Familiares** de Cristina Lozano.
+Mismo esqueleto que `kevin-mvp`: Next 16 + Tailwind 4 + pnpm, checkout de Whop
+embebido y cobro de un clic para upsells y downsells.
 
-Las **páginas de venta no viven acá**: son las de
-`cristinalozano-constelaciones.com`. Lo que vive acá es el único sitio donde el
-comprador mete la tarjeta (`/checkout`) y los saltos entre páginas que cobran
-(`/f/<paso>/<respuesta>`).
+Las páginas de venta viven en `public/paginas` y sus assets en `public/assets`.
+`tools/mirror.mjs` las descarga desde los dominios originales y
+`tools/embudo.mjs` limpia Hotmart/Facebook e inyecta los botones que apuntan a
+este sitio. El checkout (`/checkout`) sigue siendo el único lugar donde el
+comprador mete la tarjeta.
 
 ## Cómo se ata el embudo
 
-Cada botón de las páginas externas apunta a un endpoint de este sitio, **no** a
+Cada botón de las páginas espejadas apunta a un endpoint de este sitio, **no** a
 la página siguiente. Ese salto es el cobro: si "SÍ QUIERO" fuera un enlace
 directo al upsell 2, nadie habría cobrado el upsell 1.
 
@@ -39,6 +41,26 @@ VSL → /checkout → UP1 ─sí→ UP2 ─sí→ GRACIAS
 
 Se cambia en `app/(funnel)/funnel.ts`, que es donde están el orden, las URLs y
 qué plan cobra cada paso. No hay ningún otro sitio donde esté escrito.
+
+| Paso       | Producto                                     | Precio |
+| ---------- | -------------------------------------------- | ------ |
+| Checkout   | Limpiezas Energéticas                        | 67 EUR |
+| UPSELL 1   | Maldiciones familiares                       | 67 EUR |
+| DOWNSELL 1 | Maldiciones familiares                       | 33 EUR |
+| UPSELL 2   | Introducción a las constelaciones familiares | 57 EUR |
+| DOWNSELL 2 | Introducción a las constelaciones familiares | 28 EUR |
+
+Las URLs públicas no enseñan el mirror interno (`/paginas/*.html`). Next las
+reescribe así:
+
+| URL pública                                  | HTML interno                    |
+| -------------------------------------------- | ------------------------------- |
+| `/limpiezas-energeticas`                     | `/paginas/vsl-limpiezas.html`   |
+| `/maldiciones-familiares`                    | `/paginas/up1.html`             |
+| `/maldiciones-familiares-descuento`          | `/paginas/dw1.html`             |
+| `/introduccion-constelaciones-familiares`    | `/paginas/up2.html`             |
+| `/introduccion-constelaciones-descuento`     | `/paginas/dw2.html`             |
+| `/gracias`                                   | `/paginas/gracias.html`         |
 
 ### Qué hace cada respuesta
 
@@ -82,12 +104,18 @@ en el log, que es preferible a dejarlo atascado después de haber dicho que sí.
 como `redirect_url`, así que en local hay que apuntar al dominio real o a un
 túnel.
 
+Para refrescar el mirror:
+
+```bash
+node tools/mirror.mjs
+node tools/embudo.mjs
+```
+
 ## Lo que falta
 
 - **La URL del COMBO 2X1.** Es el único paso del constructor sin página
   publicada. Mientras `FUNNEL_COMBO_URL` esté vacía, el "no quiero" del
   downsell 1 cae directo a la página de gracias.
-- **Los ids de plan de Whop** de cada paso (`.env.local`).
 - **El arte del checkout** (`ARTE` en `app/(funnel)/checkout/constants.ts`): la
   pieza de arriba, las laterales y el carrusel de testimonios. Sin ellas la
   columna de venta se queda con el titular, el resumen y el cobro, que es lo

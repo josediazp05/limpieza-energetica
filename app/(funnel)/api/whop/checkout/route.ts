@@ -46,7 +46,7 @@ function limpiar(metadata: Record<string, string | undefined>) {
 
 /** El valor anunciado del plan, para que el evento de Meta no vaya sin importe. */
 function valorDelPlan(planId: string): number | undefined {
-  return Object.values(PASOS).find((p) => p.planId === planId)?.valorUsd;
+  return Object.values(PASOS).find((p) => p.planId === planId)?.valor;
 }
 
 export async function GET(request: NextRequest) {
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       eventId: config.id,
       eventTime: new Date(),
       value: valorDelPlan(planId),
-      currency: valorDelPlan(planId) ? "USD" : undefined,
+      currency: valorDelPlan(planId) ? "EUR" : undefined,
       fbc,
       fbp,
       externalId: metaExternalId,

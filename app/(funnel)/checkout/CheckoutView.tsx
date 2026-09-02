@@ -931,8 +931,8 @@ export default function CheckoutView({
   >[0];
   const tecleado = useRef<{ email?: string; address?: Direccion } | null>(null);
   const [currency, setCurrency] = useState<DisplayCurrency>({
-    baseCurrency: "USD",
-    currency: "USD",
+    baseCurrency: pricing.currency.toUpperCase(),
+    currency: pricing.currency.toUpperCase(),
     exchangeRate: 1,
   });
   const requestSeq = useRef(0);
@@ -1019,32 +1019,34 @@ export default function CheckoutView({
   /**
    * Un importe del pedido, escrito en la moneda que el iframe está mostrando.
    *
-   * Los importes vienen en la moneda del plan que se va a cobrar, que en los
-   * El producto principal siempre está en dólares, así que esta escribe lo que
-   * el iframe esté enseñando: si Whop lo convirtió a pesos, en pesos.
+   * Los importes vienen en la moneda base del plan que se va a cobrar. Esta
+   * escribe lo que el iframe esté enseñando: si Whop lo convirtió a pesos, en
+   * pesos.
    */
   const display = useCallback(
     (value: number) => {
       const amount = Math.round(value * 100) / 100;
-      if (currency.currency === currency.baseCurrency) return formatMoney(amount, "USD");
+      if (currency.currency === currency.baseCurrency) {
+        return formatMoney(amount, currency.baseCurrency);
+      }
       return formatMoney(amount * currency.exchangeRate, currency.currency);
     },
     [currency]
   );
 
   /**
-   * El bump se cobra en dólares igual que el producto, así que pasa por la
-   * misma conversión del iframe. Lo que se enseña es lo que Whop va a cobrar:
-   * la tasa sale de él, no de una tabla nuestra que se desfasa sola.
+   * El bump se cobra en la misma moneda base del producto, así que pasa por la
+   * misma conversión del iframe. Lo que se enseña es lo que Whop va a cobrar.
    */
   const displayBump = display;
 
   /**
    * El total que ve el comprador: una sola cifra, aunque por detrás sean dos
-   * ventas. Las dos están en dólares, así que se suman antes de convertir.
+   * ventas. Las dos están en la misma moneda base, así que se suman antes de
+   * convertir.
    */
   const displayTotal = useCallback(
-    (mainUsd: number, bumpsUsd: number) => display(mainUsd + bumpsUsd),
+    (mainAmount: number, bumpsAmount: number) => display(mainAmount + bumpsAmount),
     [display]
   );
 

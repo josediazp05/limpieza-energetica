@@ -1,0 +1,720 @@
+ ▐▛███▛█   Claude Code v2.1.258
+▝▜██████▀  Opus 5 · Claude Pro
+  ▝▝ ▝▝    ~/Documents/GitHub/Whop/limpieza-energetica
+
+
+❯ actualice la api de whop ya puedes revisar el env tiene permisos admin una    
+  cosa necesito que literal recrees todas estas paginas para poder actualizar   
+  el funnel aca solo descarga y pon exactamente igual lo que encuentras en esas 
+  paginas aqui localmente recrealas todas VSL limpiezas energéticas:            
+                                                                                
+  https://cristinalozano-constelaciones.com/vsl-limpiezas-energeticas-2026/     
+                                                                                
+  VSL maldiciones familiares:                                                   
+                                                                                
+  https://cristinalozano-constelaciones.com/vsl-maldiciones-familiares-2026/    
+                                                                                
+  Upsell 1                                                                      
+  https://up1.cristinalozano-constelaciones.com/                                
+                                                                                
+  Upsell 2                                                                      
+  https://up2.cristinalozano-constelaciones.com/                                
+                                                                                
+  Downsell 1                                                                    
+  https://dw1.cristinalozano-constelaciones.com/                                
+                                                                                
+  Downsell 2                                                                    
+  https://dw2.cristinalozano-constelaciones.com/                                
+                                                                                
+  Página de gracias                                                             
+                                                                                
+  https://graciaseml.cristinalozano-constelaciones.com/                         
+   aqui te paso el flujo del consumidor [Image #2] para que lo tengas en cuenta 
+  para donde va el upsell o downsell, consulta con la api los productos y       
+  enlaza todo si falta alguno crealo                                            
+  ⎿  [Image #2]
+
+⏺ I'll start by checking the project state and env.
+
+  Searched for 1 pattern, ran 15 shell commands (ctrl+o to expand)
+
+⏺ Now the Whop API — checking products and plans with the admin key.
+
+  Searched for 1 pattern, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Big job. Building the mirror script first.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Index-drift bug in my rewriter. Fixing with a two-pass approach.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Write(tools/mirror.mjs)
+  ⎿  Added 61 lines, removed 38 lines
+       4  // pide —CSS, imágenes, fuentes, y lo que esos CSS piden a su v
+          ez— en
+       5  // public/paginas/<slug>/a/. Las URLs quedan reescritas a rutas
+           locales, así que
+       6  // la copia no depende del sitio original ni de que siga public
+          ado.
+       7 +//                                                             
+       8 +// La reescritura va en dos pasadas —primero se decide y se baj
+         +a, después se                                                  
+       9 +// sustituye— porque sustituir sobre la marcha corre los índice
+         +s del resto de                                                 
+      10 +// coincidencias y deja atrás la mitad de los activos.         
+      11  import { mkdir, writeFile } from "node:fs/promises";
+      12  import { createHash } from "node:crypto";
+      13  import path from "node:path";
+      14 +import { fileURLToPath } from "node:url";                      
+      15  
+      16  const UA =
+      17    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
+          537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
+     ...
+      26    ["gracias", "https://graciaseml.cristinalozano-constelaciones
+          .com/"],
+      27  ];
+      28  
+      24 -const RAIZ = path.join(process.cwd(), "public", "paginas");    
+      29 +const PROYECTO = path.resolve(path.dirname(fileURLToPath(import
+         +.meta.url)), "..");                                            
+      30 +const RAIZ = path.join(PROYECTO, "public", "paginas");         
+      31  
+      26 -// Google Fonts se queda remoto: sirve la fuente según el naveg
+         -ador, así que                                                  
+      27 -// bajarlo daría un CSS válido para uno solo.                  
+      28 -const REMOTO = (u) => u.startsWith("https://fonts.googleapis.co
+         -m");                                                           
+      32 +// Google Fonts se queda remoto: sirve un CSS distinto según el
+         + navegador, así                                                
+      33 +// que bajarlo congelaría el de este.                          
+      34 +const REMOTO = (u) =>                                          
+      35 +  u.startsWith("https://fonts.googleapis.com") || u.startsWith(
+         +"https://fonts.gstatic.com");                                  
+      36  
+      37  async function bajar(url) {
+      38    const res = await fetch(url, { headers: { "user-agent": UA, a
+          ccept: "*/*" } });
+     ...
+      53    constructor(slug) {
+      54      this.slug = slug;
+      55      this.dir = path.join(RAIZ, slug, "a");
+      49 -    this.hechos = new Map(); // url absoluta -> ruta local     
+      56 +    this.hechos = new Map(); // url absoluta -> ruta local (o n
+         +ull si no se pudo)                                             
+      57    }
+      58  
+      52 -  // Devuelve la ruta local con la que hay que sustituir esta U
+         -RL, bajando el                                                 
+      53 -  // archivo la primera vez que aparece.                       
+      59 +  get bajados() {                                              
+      60 +    return [...this.hechos.values()].filter(Boolean).length;   
+      61 +  }                                                            
+      62 +                                                               
+      63 +  // Ruta local con la que sustituir esta URL, bajando el archi
+         +vo la primera vez                                              
+      64 +  // que aparece. `null` = déjala como está.                   
+      65    async activo(url, desde) {
+      66      let abs;
+      67      try {
+     ...
+       95    }
+       96  
+       97    async css(texto, base) {
+       87 -    const refs = [...texto.matchAll(/url\(\s*(['"]?)([^'")]+)\
+          -1\s*\)/g)];                                                   
+       88 -    let salida = texto;                                       
+       89 -    for (const ref of refs) {                                 
+       98 +    const mapa = new Map();                                   
+       99 +    for (const ref of texto.matchAll(/url\(\s*(['"]?)([^'")]+)
+          +\1\s*\)/g)) {                                                 
+      100        const cruda = ref[2].trim();
+       91 -      if (cruda.startsWith("data:") || cruda.startsWith("#")) 
+          -continue;                                                     
+      101 +      if (cruda.startsWith("data:") || cruda.startsWith("#") |
+          +| mapa.has(ref[0])) continue;                                 
+      102        const local = await this.activo(cruda, base);
+       93 -      if (local) salida = salida.split(ref[0]).join(`url("${lo
+          -cal}")`);                                                     
+      103 +      if (local) mapa.set(ref[0], `url("${local}")`);         
+      104      }
+       95 -    return salida;                                            
+      105 +    return texto.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (
+          +m) => mapa.get(m) ?? m);                                      
+      106    }
+      107  
+      108    // srcset lleva varias URLs con su descriptor: "a.png 300w, 
+           b.png 768w".
+      109    async srcset(valor, base) {
+      100 -    const partes = await Promise.all(                         
+      101 -      valor.split(",").map(async (parte) => {                 
+      102 -        const trozos = parte.trim().split(/\s+/);             
+      103 -        if (!trozos[0]) return null;                          
+      104 -        const local = await this.activo(trozos[0], base);     
+      105 -        return [local ?? trozos[0], ...trozos.slice(1)].join("
+          - ");                                                          
+      106 -      }),                                                     
+      107 -    );                                                        
+      108 -    return partes.filter(Boolean).join(", ");                 
+      110 +    const partes = [];                                        
+      111 +    for (const parte of valor.split(",")) {                   
+      112 +      const trozos = parte.trim().split(/\s+/);               
+      113 +      if (!trozos[0]) continue;                               
+      114 +      const local = await this.activo(trozos[0], base);       
+      115 +      partes.push([local ?? trozos[0], ...trozos.slice(1)].joi
+          +n(" "));                                                      
+      116 +    }                                                         
+      117 +    return partes.join(", ");                                 
+      118    }
+      119  }
+      120  
+      121 +// Un `href` dentro de un <a> es navegación, no un activo. Igu
+          +al los <link> de                                              
+      122 +// metadatos (canonical, feeds, oembed) y las pistas de red (p
+          +reconnect).                                                   
+      123 +const ATTR = /\b(href|src|data-src|poster)\s*=\s*(['"])([^'"]*
+          +)\2/gi;                                                       
+      124 +const ES_NAVEGACION = /<a\b[^>]*$/i;                          
+      125 +const ES_META =                                               
+      126 +  /<link\b[^>]*\brel=(['"])(canonical|alternate|shortlink|next
+          +|prev|pingback|EditURI|https:\/\/api\.w\.org\/|preconnect|dns-
+          +prefetch|profile)\1[^>]*$/i;                                  
+      127 +                                                              
+      128  async function mirror(slug, url) {
+      129    console.log(`\n=== ${slug} ← ${url}`);
+      130    const { buf } = await bajar(url);
+      115 -  let html = buf.toString("utf8");                            
+      131 +  const original = buf.toString("utf8");                      
+      132    const d = new Descarga(slug);
+      133  
+      118 -  // <style> del propio HTML: también puede pedir imágenes de 
+          -fondo.                                                        
+      119 -  const estilos = [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<
+          -\/style>/gi)];                                                
+      120 -  for (const est of estilos) {                                
+      134 +  // Pasada 1: decidir y bajar, apuntando cada sustitución por
+          + posición.                                                    
+      135 +  const cambios = []; // { desde, hasta, texto }              
+      136 +                                                              
+      137 +  for (const est of original.matchAll(/<style\b[^>]*>([\s\S]*?
+          +)<\/style>/gi)) {                                             
+      138      const nuevo = await d.css(est[1], url);
+      122 -    if (nuevo !== est[1]) html = html.replace(est[0], est[0].r
+          -eplace(est[1], nuevo));                                       
+      139 +    if (nuevo !== est[1]) {                                   
+      140 +      const desde = est.index + est[0].indexOf(est[1]);       
+      141 +      cambios.push({ desde, hasta: desde + est[1].length, text
+          +o: nuevo });                                                  
+      142 +    }                                                         
+      143    }
+      144  
+      125 -  // Atributos que apuntan a un archivo. `content` solo en las
+          - og:image.                                                    
+      126 -  const attrs = [...html.matchAll(/\b(href|src|data-src|poster
+          -)\s*=\s*(['"])([^'"]*)\2/gi)];                                
+      127 -  for (const a of attrs) {                                    
+      145 +  for (const a of original.matchAll(ATTR)) {                  
+      146      const valor = a[3].trim();
+      147      if (!valor || valor.startsWith("#") || valor.startsWith("d
+           ata:") || valor.startsWith("mailto:")) continue;
+      130 -    // Los <a> son navegación, no activos: se dejan para el re
+          -escritor del embudo.                                          
+      131 -    const antes = html.slice(Math.max(0, a.index - 200), a.ind
+          -ex);                                                          
+      132 -    if (/<a\b[^>]*$/i.test(antes) || /<link\b[^>]*rel=(['"])(c
+          -anonical|alternate|shortlink|next|prev)\1[^>]*$/i.test(antes))
+          - continue;                                                    
+      148 +    const antes = original.slice(Math.max(0, a.index - 400), a
+          +.index);                                                      
+      149 +    if (ES_NAVEGACION.test(antes) || ES_META.test(antes)) cont
+          +inue;                                                         
+      150      const local = await d.activo(valor, url);
+      134 -    if (local) html = html.split(a[0]).join(`${a[1]}="${local}
+          -"`);                                                          
+      151 +    if (local) cambios.push({ desde: a.index, hasta: a.index +
+          + a[0].length, texto: `${a[1]}="${local}"` });                 
+      152    }
+      153  
+      137 -  const sets = [...html.matchAll(/\bsrcset\s*=\s*(['"])([^'"]*
+          -)\1/gi)];                                                     
+      138 -  for (const s of sets) {                                     
+      154 +  for (const s of original.matchAll(/\bsrcset\s*=\s*(['"])([^'
+          +"]*)\1/gi)) {                                                 
+      155      const nuevo = await d.srcset(s[2], url);
+      140 -    if (nuevo) html = html.split(s[0]).join(`srcset="${nuevo}"
+          -`);                                                           
+      156 +    if (nuevo && nuevo !== s[2]) {                            
+      157 +      cambios.push({ desde: s.index, hasta: s.index + s[0].len
+          +gth, texto: `srcset="${nuevo}"` });                           
+      158 +    }                                                         
+      159    }
+      160  
+      161 +  // Pasada 2: aplicar de atrás hacia delante, para no correr 
+          +los índices.                                                  
+      162 +  cambios.sort((a, b) => b.desde - a.desde);                  
+      163 +  let html = original;                                        
+      164 +  for (const c of cambios) html = html.slice(0, c.desde) + c.t
+          +exto + html.slice(c.hasta);                                   
+      165 +                                                              
+      166    await mkdir(path.join(RAIZ, slug), { recursive: true });
+      167    await writeFile(path.join(RAIZ, slug, "index.html"), html);
+      145 -  console.log(`  ${d.hechos.size} activos → public/paginas/${s
+          -lug}/`);                                                      
+      168 +  console.log(`  ${d.bajados} activos, ${cambios.length} refer
+          +encias → public/paginas/${slug}/`);                           
+      169  }
+      170  
+      171  for (const [slug, url] of PAGINAS) await mirror(slug, url);
+
+  Ran 4 shell commands (ctrl+o to expand)
+❯ por cierto las imagenes y esas cosas dejalas orgainzadas renombra public por  
+  assets y dividelo en tres carpetas /images /svg /fonts                        
+
+⏺ Note on that: Next.js requires the static dir be literally public/ — can't
+  rename it. Organizing inside it as public/assets/{images,svg,fonts,css,js}
+  instead, with global dedupe across pages.
+
+⏺ Write(tools/mirror.mjs)
+  ⎿  Added 93 lines, removed 41 lines
+       1 -// Baja una página del embudo y la deja servible desde este pro
+         -yecto.                                                         
+       1 +// Baja las páginas del embudo y las deja servibles desde este 
+         +proyecto.                                                      
+       2  //
+       3 -// Guarda el HTML en public/paginas/<slug>/index.html y todo lo
+         - que la página                                                 
+       4 -// pide —CSS, imágenes, fuentes, y lo que esos CSS piden a su v
+         -ez— en                                                         
+       5 -// public/paginas/<slug>/a/. Las URLs quedan reescritas a rutas
+         - locales, así que                                              
+       6 -// la copia no depende del sitio original ni de que siga public
+         -ado.                                                           
+       3 +// El HTML de cada una queda en public/paginas/<slug>.html y to
+         +do lo que pide                                                 
+       4 +// —CSS, imágenes, fuentes, y lo que esos CSS piden a su vez— e
+         +n                                                              
+       5 +// public/assets/<tipo>/. Las URLs quedan reescritas a rutas lo
+         +cales, así que la                                              
+       6 +// copia no depende del sitio original ni de que siga publicado
+         +.                                                              
+       7  //
+       8 +// `public/` se llama así porque es el nombre que Next exige pa
+         +ra los estáticos;                                              
+       9 +// dentro va todo ordenado por tipo. El nombre de cada archivo 
+         +lleva el hash de                                               
+      10 +// su URL, así que las dos VSL —que comparten casi todo el arte
+         + de marca— se                                                  
+      11 +// bajan una sola vez.                                         
+      12 +//                                                             
+      13  // La reescritura va en dos pasadas —primero se decide y se baj
+          a, después se
+      14  // sustituye— porque sustituir sobre la marcha corre los índice
+          s del resto de
+      15  // coincidencias y deja atrás la mitad de los activos.
+     ...
+      32  ];
+      33  
+      34  const PROYECTO = path.resolve(path.dirname(fileURLToPath(import
+          .meta.url)), "..");
+      30 -const RAIZ = path.join(PROYECTO, "public", "paginas");         
+      35 +const PUBLICO = path.join(PROYECTO, "public");                 
+      36  
+      37 +/** En qué carpeta de public/assets cae cada archivo, por su ex
+         +tensión. */                                                    
+      38 +const CARPETAS = {                                             
+      39 +  images: [".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", "
+         +.ico", ".bmp"],                                                
+      40 +  svg: [".svg"],                                               
+      41 +  fonts: [".woff", ".woff2", ".ttf", ".otf", ".eot"],          
+      42 +  css: [".css"],                                               
+      43 +  js: [".js", ".mjs", ".json", ".map"],                        
+      44 +};                                                             
+      45 +                                                               
+      46 +function carpetaDe(ext, tipo) {                                
+      47 +  const e = ext.toLowerCase();                                 
+      48 +  for (const [carpeta, exts] of Object.entries(CARPETAS)) if (e
+         +xts.includes(e)) return carpeta;                               
+      49 +  // Sin extensión útil —los CDN sirven de todo desde rutas sin
+         + punto— manda el                                               
+      50 +  // content-type: si no, todo lo raro acabaría mezclado con la
+         +s imágenes.                                                    
+      51 +  if (tipo.startsWith("image/svg")) return "svg";              
+      52 +  if (tipo.startsWith("image/")) return "images";              
+      53 +  if (tipo.startsWith("font/") || tipo.includes("font")) return
+         + "fonts";                                                      
+      54 +  if (tipo.includes("css")) return "css";                      
+      55 +  if (tipo.includes("javascript") || tipo.includes("json")) ret
+         +urn "js";                                                      
+      56 +  return "otros";                                              
+      57 +}                                                              
+      58 +                                                               
+      59 +/** Extensión canónica para lo que llega sin ella en la URL. */
+      60 +const EXT_POR_TIPO = {                                         
+      61 +  "image/png": ".png",                                         
+      62 +  "image/jpeg": ".jpg",                                        
+      63 +  "image/gif": ".gif",                                         
+      64 +  "image/webp": ".webp",                                       
+      65 +  "image/avif": ".avif",                                       
+      66 +  "image/svg+xml": ".svg",                                     
+      67 +  "text/css": ".css",                                          
+      68 +  "application/javascript": ".js",                             
+      69 +  "text/javascript": ".js",                                    
+      70 +  "font/woff2": ".woff2",                                      
+      71 +  "font/woff": ".woff",                                        
+      72 +  "font/ttf": ".ttf",                                          
+      73 +};                                                             
+      74 +                                                               
+      75  // Google Fonts se queda remoto: sirve un CSS distinto según el
+           navegador, así
+      76  // que bajarlo congelaría el de este.
+      77  const REMOTO = (u) =>
+     ...
+       80  async function bajar(url) {
+       81    const res = await fetch(url, { headers: { "user-agent": UA, 
+           accept: "*/*" } });
+       82    if (!res.ok) throw new Error(`${res.status} ${url}`);
+       40 -  return { buf: Buffer.from(await res.arrayBuffer()), tipo: re
+          -s.headers.get("content-type") ?? "" };                        
+       83 +  const tipo = (res.headers.get("content-type") ?? "").split("
+          +;")[0].trim();                                                
+       84 +  return { buf: Buffer.from(await res.arrayBuffer()), tipo }; 
+       85  }
+       86  
+       43 -function nombreLocal(url) {                                   
+       44 -  const u = new URL(url);                                     
+       45 -  const base = path.basename(u.pathname) || "index";          
+       46 -  const ext = path.extname(base);                             
+       47 -  const hash = createHash("sha1").update(url).digest("hex").sl
+          -ice(0, 8);                                                    
+       48 -  const limpio = base.slice(0, ext ? -ext.length : undefined).
+          -replace(/[^\w.-]+/g, "-").slice(0, 60);                       
+       49 -  return `${limpio || "asset"}-${hash}${ext}`;                
+       50 -}                                                             
+       51 -                                                              
+       52 -class Descarga {                                              
+       53 -  constructor(slug) {                                         
+       54 -    this.slug = slug;                                         
+       55 -    this.dir = path.join(RAIZ, slug, "a");                    
+       56 -    this.hechos = new Map(); // url absoluta -> ruta local (o 
+          -null si no se pudo)                                           
+       87 +/**                                                           
+       88 + * El almacén de activos: uno para todo el mirror, para que un
+          + archivo que usan                                             
+       89 + * dos páginas se baje —y se guarde— una sola vez.            
+       90 + */                                                           
+       91 +class Almacen {                                               
+       92 +  constructor() {                                             
+       93 +    this.hechos = new Map(); // url absoluta -> ruta pública (
+          +o null si no se pudo)                                         
+       94    }
+       95  
+       96    get bajados() {
+       97      return [...this.hechos.values()].filter(Boolean).length;
+       98    }
+       99  
+       63 -  // Ruta local con la que sustituir esta URL, bajando el arch
+          -ivo la primera vez                                            
+       64 -  // que aparece. `null` = déjala como está.                  
+      100 +  nombre(url, ext) {                                          
+      101 +    const base = path.basename(new URL(url).pathname) || "asse
+          +t";                                                           
+      102 +    const propia = path.extname(base);                        
+      103 +    const hash = createHash("sha1").update(url).digest("hex").
+          +slice(0, 8);                                                  
+      104 +    const limpio = base                                       
+      105 +      .slice(0, propia ? -propia.length : undefined)          
+      106 +      .replace(/[^\w.-]+/g, "-")                              
+      107 +      .replace(/^-+|-+$/g, "")                                
+      108 +      .slice(0, 60);                                          
+      109 +    return `${limpio || "asset"}-${hash}${ext}`;              
+      110 +  }                                                           
+      111 +                                                              
+      112 +  // Ruta pública con la que sustituir esta URL, bajando el ar
+          +chivo la primera                                              
+      113 +  // vez que aparece. `null` = déjala como está.              
+      114    async activo(url, desde) {
+      115      let abs;
+      116      try {
+     ...
+      120      }
+      121      if (!/^https?:/.test(abs) || REMOTO(abs)) return null;
+      122      if (this.hechos.has(abs)) return this.hechos.get(abs);
+      123 +    this.hechos.set(abs, null); // corta los ciclos entre CSS 
+          +mientras se baja                                              
+      124  
+       75 -    const nombre = nombreLocal(abs);                          
+       76 -    const destino = `/paginas/${this.slug}/a/${nombre}`;      
+       77 -    this.hechos.set(abs, destino); // antes de bajar: corta lo
+          -s ciclos entre CSS                                            
+       78 -                                                              
+      125      let datos;
+      126      try {
+      127        datos = await bajar(abs);
+      128      } catch (err) {
+      129        console.warn(`  ! ${err.message}`);
+       84 -      this.hechos.set(abs, null);                             
+      130        return null;
+      131      }
+      132  
+      133 +    const ext = path.extname(new URL(abs).pathname) || EXT_POR
+          +_TIPO[datos.tipo] || "";                                      
+      134 +    const carpeta = carpetaDe(ext, datos.tipo);               
+      135 +    const nombre = this.nombre(abs, ext);                     
+      136 +    const destino = `/assets/${carpeta}/${nombre}`;           
+      137 +    this.hechos.set(abs, destino);                            
+      138 +                                                              
+      139      // Un CSS puede pedir fuentes e imágenes: se reescribe igu
+           al que el HTML.
+       89 -    const esCss = /text\/css/.test(datos.tipo) || abs.split("?
+          -")[0].endsWith(".css");                                       
+       90 -    const cuerpo = esCss ? Buffer.from(await this.css(datos.bu
+          -f.toString("utf8"), abs)) : datos.buf;                        
+      140 +    const cuerpo =                                            
+      141 +      carpeta === "css" ? Buffer.from(await this.css(datos.buf
+          +.toString("utf8"), abs)) : datos.buf;                         
+      142  
+       92 -    await mkdir(this.dir, { recursive: true });               
+       93 -    await writeFile(path.join(this.dir, nombre), cuerpo);     
+      143 +    await mkdir(path.join(PUBLICO, "assets", carpeta), { recur
+          +sive: true });                                                
+      144 +    await writeFile(path.join(PUBLICO, "assets", carpeta, nomb
+          +re), cuerpo);                                                 
+      145      return destino;
+      146    }
+      147  
+     ...
+      176  const ES_META =
+      177    /<link\b[^>]*\brel=(['"])(canonical|alternate|shortlink|next
+           |prev|pingback|EditURI|https:\/\/api\.w\.org\/|preconnect|dns-
+           prefetch|profile)\1[^>]*$/i;
+      178  
+      128 -async function mirror(slug, url) {                            
+      179 +async function mirror(almacen, slug, url) {                   
+      180    console.log(`\n=== ${slug} ← ${url}`);
+      181    const { buf } = await bajar(url);
+      182    const original = buf.toString("utf8");
+      132 -  const d = new Descarga(slug);                               
+      183  
+      184    // Pasada 1: decidir y bajar, apuntando cada sustitución por
+            posición.
+      185    const cambios = []; // { desde, hasta, texto }
+      186  
+      187    for (const est of original.matchAll(/<style\b[^>]*>([\s\S]*?
+           )<\/style>/gi)) {
+      138 -    const nuevo = await d.css(est[1], url);                   
+      188 +    const nuevo = await almacen.css(est[1], url);             
+      189      if (nuevo !== est[1]) {
+      190        const desde = est.index + est[0].indexOf(est[1]);
+      191        cambios.push({ desde, hasta: desde + est[1].length, text
+           o: nuevo });
+     ...
+      197      if (!valor || valor.startsWith("#") || valor.startsWith("d
+           ata:") || valor.startsWith("mailto:")) continue;
+      198      const antes = original.slice(Math.max(0, a.index - 400), a
+           .index);
+      199      if (ES_NAVEGACION.test(antes) || ES_META.test(antes)) cont
+           inue;
+      150 -    const local = await d.activo(valor, url);                 
+      200 +    const local = await almacen.activo(valor, url);           
+      201      if (local) cambios.push({ desde: a.index, hasta: a.index +
+            a[0].length, texto: `${a[1]}="${local}"` });
+      202    }
+      203  
+      204    for (const s of original.matchAll(/\bsrcset\s*=\s*(['"])([^'
+           "]*)\1/gi)) {
+      155 -    const nuevo = await d.srcset(s[2], url);                  
+      205 +    const nuevo = await almacen.srcset(s[2], url);            
+      206      if (nuevo && nuevo !== s[2]) {
+      207        cambios.push({ desde: s.index, hasta: s.index + s[0].len
+           gth, texto: `srcset="${nuevo}"` });
+      208      }
+     ...
+      213    let html = original;
+      214    for (const c of cambios) html = html.slice(0, c.desde) + c.t
+           exto + html.slice(c.hasta);
+      215  
+      166 -  await mkdir(path.join(RAIZ, slug), { recursive: true });    
+      167 -  await writeFile(path.join(RAIZ, slug, "index.html"), html); 
+      168 -  console.log(`  ${d.bajados} activos, ${cambios.length} refer
+          -encias → public/paginas/${slug}/`);                           
+      216 +  await mkdir(path.join(PUBLICO, "paginas"), { recursive: true
+          + });                                                          
+      217 +  await writeFile(path.join(PUBLICO, "paginas", `${slug}.html`
+          +), html);                                                     
+      218 +  console.log(`  ${cambios.length} referencias → public/pagina
+          +s/${slug}.html`);                                             
+      219  }
+      220  
+      171 -for (const [slug, url] of PAGINAS) await mirror(slug, url);   
+      221 +const almacen = new Almacen();                                
+      222 +for (const [slug, url] of PAGINAS) await mirror(almacen, slug,
+          + url);                                                        
+      223 +console.log(`\n${almacen.bajados} activos en public/assets/`);
+
+  Read 1 file, ran 5 shell commands (ctrl+o to expand)
+
+⏺ Update(tools/mirror.mjs)
+  ⎿  Added 11 lines, removed 2 lines
+      21  const UA =
+      22    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/
+          537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
+      23  
+      24 +// El slug es el paso del embudo, no el subdominio de donde sal
+         +e la página.                                                   
+      25 +//                                                             
+      26 +// Y en los downsell NO coinciden: dw1.cristinalozano vende Int
+         +roducción a 28 €                                               
+      27 +// y dw2.cristinalozano vende Maldiciones a 33 €, o sea al revé
+         +s de lo que pide                                               
+      28 +// el embudo. El downsell 1 cuelga del "no quiero" del upsell 1
+         + —Maldiciones a                                                
+      29 +// 67 €—, así que tiene que ser el de Maldiciones a mitad de pr
+         +ecio; y el                                                     
+      30 +// downsell 2 cuelga del upsell 2 —Introducción a 57 €—, así qu
+         +e es el de                                                     
+      31 +// Introducción a 28 €. Se bajan cruzados a propósito: manda el
+         + producto que                                                  
+      32 +// vende cada página, no el nombre del subdominio.             
+      33  const PAGINAS = [
+      34    ["vsl-limpiezas", "https://cristinalozano-constelaciones.com/
+          vsl-limpiezas-energeticas-2026/"],
+      35    ["vsl-maldiciones", "https://cristinalozano-constelaciones.co
+          m/vsl-maldiciones-familiares-2026/"],
+      36    ["up1", "https://up1.cristinalozano-constelaciones.com/"],
+      37    ["up2", "https://up2.cristinalozano-constelaciones.com/"],
+      29 -  ["dw1", "https://dw1.cristinalozano-constelaciones.com/"],   
+      30 -  ["dw2", "https://dw2.cristinalozano-constelaciones.com/"],   
+      38 +  ["dw1", "https://dw2.cristinalozano-constelaciones.com/"],   
+      39 +  ["dw2", "https://dw1.cristinalozano-constelaciones.com/"],   
+      40    ["gracias", "https://graciaseml.cristinalozano-constelaciones
+          .com/"],
+      41  ];
+      42  
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Now the rewiring script: strip the old Hotmart/tracking layer and inject the
+  Whop CTAs.
+
+⏺ Write(tools/embudo.mjs)
+  ⎿  Wrote 234 lines to tools/embudo.mjs
+       1 // Pasa las páginas bajadas por tools/mirror.mjs del embudo viej
+       2 //
+       4 //
+       5 //  1. Quita la instrumentación del embudo anterior —Hotmart, lo
+       6 //     Clarity, el fbq de la cuenta vieja, la analítica de Lovab
+       7 //     limpieza estética: son scripts que siguen reportando a pa
+       8 //     esta cuenta, y el píxel de Meta de este embudo lo pone el
+          servidor con el
+         .
+         rvidas ya
+     … +294 lines (ctrl+o to expand)
+
+  Searched for 1 pattern, ran 4 shell commands (ctrl+o to expand)
+
+⏺ Two rewriter bugs: it edited src="..." string literals inside <script> blocks.
+  Fixing and re-running the whole mirror.
+
+⏺ Update(tools/mirror.mjs)
+  ⎿  Added 19 lines
+      185  const ES_META =
+      186    /<link\b[^>]*\brel=(['"])(canonical|alternate|shortlink|next
+           |prev|pingback|EditURI|https:\/\/api\.w\.org\/|preconnect|dns-
+           prefetch|profile)\1[^>]*$/i;
+      187  
+      188 +/**                                                           
+      189 + * Los tramos del documento que son JavaScript, no marcado.   
+      190 + *                                                            
+      191 + * Dentro de un <script> hay cosas que se leen igual que un at
+          +ributo —                                                      
+      192 + * `avatar.src="https://randomuser.me/api/portraits/women/"`, 
+          +que además se                                                 
+      193 + * concatena con el número de la foto— y reescribirlas rompe e
+          +l script sin que                                              
+      194 + * salte nada: la página carga y el avatar sale roto.         
+      195 + */                                                           
+      196 +function tramosDeScript(html) {                               
+      197 +  const tramos = [];                                          
+      198 +  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/s
+          +cript>/gi)) {                                                 
+      199 +    tramos.push([m.index, m.index + m[0].length]);            
+      200 +  }                                                           
+      201 +  return tramos;                                              
+      202 +}                                                             
+      203 +                                                              
+      204 +const dentroDe = (tramos, i) => tramos.some(([a, b]) => i >= a
+          + && i < b);                                                   
+      205 +                                                              
+      206  async function mirror(almacen, slug, url) {
+      207    console.log(`\n=== ${slug} ← ${url}`);
+      208    const { buf } = await bajar(url);
+      209    const original = buf.toString("utf8");
+      210 +  const scripts = tramosDeScript(original);                   
+      211  
+      212    // Pasada 1: decidir y bajar, apuntando cada sustitución por
+            posición.
+      213    const cambios = []; // { desde, hasta, texto }
+
+⏺ Update(tools/mirror.mjs)
+  ⎿  Added 1 line
+      223    for (const a of original.matchAll(ATTR)) {
+      224      const valor = a[3].trim();
+      225      if (!valor || valor.startsWith("#") || valor.startsWith("d
+           ata:") || valor.startsWith("mailto:")) continue;
+      226 +    if (dentroDe(scripts, a.index)) continue;                 
+      227      const antes = original.slice(Math.max(0, a.index - 400), a
+           .index);
+      228      if (ES_NAVEGACION.test(antes) || ES_META.test(antes)) cont
+           inue;
+      229      const local = await almacen.activo(valor, url);
+
+⏺ Now the <noscript> pixel rule, matching the rewritten path:
+
+⏺ Update(tools/embudo.mjs)
+  ⎿  Added 3 lines, removed 2 lines
+      121  
+      122  function limpiar(html) {
+      123    let out = quitar(html, "script", (b) => SOBRA_SCRIPT.some((r
+           e) => re.test(b)));
+      124 -  // El <noscript> del píxel viejo pide una imagen a facebook.
+          -com/tr.                                                       
+      125 -  out = quitar(out, "noscript", (b) => /facebook\.com\/tr/i.te
+          -st(b));                                                       
+      124 +  // El <noscript> del píxel viejo: una imagen de 1x1 a facebo
+          +ok.com/tr, que                                                
+      125 +  // tools/mirror.mjs ya habrá bajado a /assets/ con el resto.
+      126 +  out = quitar(out, "noscript", (b) => /facebook\.com\/tr|\/as
+          +sets\/\w+\/tr-/i.test(b));                                    
+      127    // modulepreload: sin bundle que precargar, es una petición 
+           a un 404.
+      128    out = out.replace(/<link\b[^>]*rel=(['"])modulepreload\1[^>]
+           *>\s*/gi, "");
+      129    // El marcador de streaming de React, ya sin nada que hidrat
+           ar.
+
+  Ran 2 shell commands (ctrl+o to expand)
+
+⏺ Update(tools/mirror.mjs)
+  ⎿  Added 4 lines, removed 2 lines
+      195   */
+      196  function tramosDeScript(html) {
+      197    const tramos = [];
+      198 -  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/s
+          -cript>/gi)) {                                                 
+      199 -    tramos.push([m.index, m.index + m[0].length]);            
+      198 +  for (const m of html.matchAll(/(<script\b[^>]*>)([\s\S]*?)<\
+          +/script>/gi)) {                                               
+      199 +    // Solo el cuerpo: el `src` de la etiqueta de apertura sí 
+          +es un activo.                                                 
+      200 +    const cuerpo = m.index + m[1].length;                     
+      201 +    tramos.push([cuerpo, cuerpo + m[2].length]);              
+      202    }
+      203    return tramos;
+      204  }
+  Listed 1 directory, ran 1 shell command (ctrl+o to expand)
+  ⎿  You've hit your session limit · resets 11:10pm (America/Bogota)
+     /upgrade to increase your usage limit.
+
+✻ Baked for 19m 56s · done 9:33 PM

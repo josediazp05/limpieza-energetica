@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /* El checkout se dibuja con estilos en línea —viene de la maqueta de Figma— y
-   solo necesita del CSS global el tipo de letra y que la página no tenga
-   márgenes del navegador. Las páginas de venta viven fuera de este proyecto. */
+   solo necesita del CSS global el tipo de letra, el scroll de sus columnas y
+   los ajustes del iframe de Whop. */
 :root {
   --font-inter: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
@@ -18,4 +18,74 @@ body {
   font-family: var(--font-inter);
   background: #ffffff;
   color: #111113;
+}
+
+/* Checkout: dos mitades con scroll propio.
+   En escritorio la página no scrollea; scrollea cada columna por su cuenta, y
+   ninguna enseña barra. En móvil no se pinta esta maqueta partida y el scroll
+   vuelve a ser el normal de la página. */
+body:has(.checkout-split) {
+  overflow: hidden;
+}
+
+/* La firma de Whop al pie del formulario vive dentro del iframe, en otro
+   origen. Se recorta subiendo el iframe con un margen negativo y dejando que
+   el contenedor `data-embed-pago` haga el corte. */
+[data-embed-pago] iframe {
+  display: block;
+  margin-bottom: var(--recorte-iframe, -66px);
+}
+
+[data-embed-pago="listo"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--desvanecido-embed, 22px);
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0) 45%, #ffffff);
+  pointer-events: none;
+}
+
+[data-embed-pago="cargando"] iframe {
+  min-height: 900px;
+}
+
+.checkout-pane {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.checkout-pane::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.whop-loading-mark__bar {
+  transform-box: view-box;
+  transform-origin: 0px 28.7px;
+  animation: whop-loading-stretch 1.3s linear infinite both;
+}
+
+@keyframes whop-loading-stretch {
+  0% {
+    transform: rotate(-45deg) scaleX(0) rotate(45deg);
+    animation-timing-function: cubic-bezier(0.34, 0, 0.26, 1);
+  }
+  45% {
+    transform: rotate(-45deg) scaleX(1.25) rotate(45deg);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1);
+  }
+  100% {
+    transform: rotate(-45deg) scaleX(0) rotate(45deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whop-loading-mark__bar {
+    animation: none;
+  }
 }

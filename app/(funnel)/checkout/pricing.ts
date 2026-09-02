@@ -1,5 +1,5 @@
 import { getPlan, money } from "@/lib/whop";
-import { MAIN_FALLBACK_USD, MAIN_PLAN_ID, ORDER_BUMPS } from "./constants";
+import { MAIN_FALLBACK_AMOUNT, MAIN_PLAN_ID, ORDER_BUMPS } from "./constants";
 
 // Cuánto cuesta un pedido. Lo comparten la página —que lo pinta— y la ruta que
 // abre la sesión —que lo cobra—, para que no puedan discrepar: si el precio se
@@ -19,8 +19,8 @@ export interface BumpPrice {
   monthly: number;
   /**
    * El precio ancla —el tachado y el % de la pastilla—, ya en la moneda del
-   * pedido. No se cobra, pero se anuncia: en pesos no puede quedarse en los
-   * 13,37 dólares del copy o el tachado diría "13 COP".
+   * pedido. No se cobra, pero se anuncia: en pesos no puede quedarse en el
+   * importe base del copy o el tachado diría "13 COP".
    */
   compareAt: number;
   /** Días entre cobros. `null` si no es recurrente. */
@@ -28,6 +28,8 @@ export interface BumpPrice {
 }
 
 export interface OrderPricing {
+  /** Moneda base del plan principal. */
+  currency: string;
   /** Producto al que pertenece el plan principal en Whop. */
   mainProductId: string | null;
   /** Tipo de plan principal: pago único o renovación. */
@@ -41,9 +43,9 @@ export interface OrderPricing {
 /**
  * Los precios de todo lo que hay en la página, tal como está hoy en Whop.
  *
- * Todos en dólares, que es la moneda en la que entra la venta —el producto y
- * el bump—. Lo que ve el comprador en la suya lo convierte Whop dentro del
- * iframe, y la página copia esa misma tasa para el resumen.
+ * Todos en la moneda base del plan principal. Lo que ve el comprador en la
+ * suya lo convierte Whop dentro del iframe, y la página copia esa misma tasa
+ * para el resumen.
  */
 export async function loadPricing(): Promise<OrderPricing> {
   const [mainPlan, bumpPlans] = await Promise.all([
@@ -53,9 +55,9 @@ export async function loadPricing(): Promise<OrderPricing> {
     Promise.all(ORDER_BUMPS.map((bump) => getPlan(bump.planId))),
   ]);
 
-  // Los respaldos del copy ya están en dólares, que es la moneda en la que se
-  // cobra el bump. La página los convierte al pintarlos, con la tasa del iframe.
-  const respaldo = (usd: number) => money(usd);
+  // Los respaldos del copy ya están en la moneda del plan. La página los
+  // convierte al pintarlos, con la tasa del iframe.
+  const respaldo = (amount: number) => money(amount);
 
   const bumps: Record<string, BumpPrice> = {};
   ORDER_BUMPS.forEach((bump, index) => {
@@ -94,15 +96,15 @@ export async function loadPricing(): Promise<OrderPricing> {
     };
   });
 
-  const mainUsd = money(mainPlan?.initialPrice ?? MAIN_FALLBACK_USD);
+  const mainAmount = money(mainPlan?.initialPrice ?? MAIN_FALLBACK_AMOUNT);
 
   return {
+    currency: mainPlan?.currency ?? "eur",
     mainProductId: mainPlan?.productId ?? null,
     mainPlanType: mainPlan?.planType ?? "one_time",
-    // Nunca se convierte acá: son 69 USD, y así entra la venta. Lo que ve el
-    // comprador lo convierte Whop dentro del iframe, que con el plan de pago
-    // único del producto sí funciona.
-    mainToday: mainUsd,
+    // Nunca se convierte acá: es el importe base de Whop. Lo que ve el
+    // comprador lo convierte Whop dentro del iframe.
+    mainToday: mainAmount,
     bumps,
   };
 }
